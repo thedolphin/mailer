@@ -1,0 +1,15 @@
+#!/bin/sh
+
+exec 2>&1
+
+LOG_DIR='/var/log/mailer/'$(basename ${PWD%/log})
+LOG_SIZE=16777215
+LOG_NUMBER=64
+
+LOGGER="svlogd -tt"
+
+[ -d ${LOG_DIR} ] || mkdir -p ${LOG_DIR} || exit
+chmod 700 ${LOG_DIR} || exit
+echo -e "s${LOG_SIZE}\nn${LOG_NUMBER}" > ${LOG_DIR}/config
+
+exec ${LOGGER} ${LOG_DIR}
