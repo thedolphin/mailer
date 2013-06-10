@@ -32,11 +32,17 @@ try {
         $email = $row ? $row[0] : $row;
 
         if($email) {
+            if(isset($_GET['unsub']) && $_GET['unsub'] == 'yes') {
 
-            if(!mysql_query("UPDATE maillog SET unsubscribe = 1 where message_id = UNHEX(REPLACE('{$message_id}', '-', ''))" ))
-                throw new Exception("Cannot update maillog" . mysql_error ($db));
+                if(!mysql_query("UPDATE maillog SET unsubscribe = 1 where message_id = UNHEX(REPLACE('{$message_id}', '-', ''))" ))
+                    throw new Exception("Cannot update maillog" . mysql_error ($db));
 
-            print("Подписка отменена для адреса {$email}");
+                print("Подписка отменена для адреса {$email}");
+
+            } else {
+
+                print("Пожалуйста, подтвердите запрос на отмену подписки для адреса {$email}.<ul><li><a href=\"http://mailer.wikimart.ru/unsubscribe?id={$message_id}&unsub=yes\">Да, я хочу отписаться от рассылки!</a></li><li><a href=\"http://wikimart.ru\">Нет, я хочу получать спецпредложения от Викимарта</a></li></ul>");
+            }
 
         } else {
 

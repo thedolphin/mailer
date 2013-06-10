@@ -86,6 +86,8 @@ function str_rand($len) {
 
 function encoded_word($str) {
 
+    if(substr($str, 0, 2) == '=?') return $str;
+
     return '=?utf-8?B?' . base64_encode($str) . '?=';
 }
 

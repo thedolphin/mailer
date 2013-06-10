@@ -4,11 +4,33 @@
 require 'common.php';
 
 /*
+
+Message in amqp mailqueue must be serialized array.
+
 $mail = array(
         'headers' => array(),
         'data' => $message,
         'campaign' => 0
     )
+
+'headers' field:
+
+To:         required, email address, may be with alias, i.e. "user@host.dom" or "User Name <user@host.dom>", may be encoded, will be encoded otherwise
+Subject:    required, may be encoded, will be encoded otherwise
+Reply-To:   default used if omited
+Date:       current date used if omited
+Message-Id: tracking UUID, may be omited in case of single email, must exist in case of campaign when used in mail body
+From:       will be replaced anyway with address of bounce catcher
+
+Any other headers will be added without modifications
+
+'data' field: contains message body, each line must end with '\r\n', otherwise DKIM signing will fail.
+
+'campaign' filed: distinguishing number to be stored in database.
+If more than 0, the recipient address will be checked against unsubscribed list.
+If 0 or omited, the mail considered to be regular.
+
+Each mail recipient address will be checked against bounced list
 
 */
 
@@ -41,25 +63,18 @@ try {
             $mail['campaign'] = 0;
         }
 
+        $q = "SELECT id FROM maillog WHERE email = '{$escaped_rcpt_to}' and bounced = 1 LIMIT 1";
 
-        $query = "SELECT bounced, unsubscribe FROM maillog WHERE email = '{$escaped_rcpt_to}' and (bounced = 1 or unsubscribe = 1)";
+        if ($mail['campaign'] > 0)
+            $q .= " UNION SELECT id FROM maillog WHERE email = '{$escaped_rcpt_to}' and unsubscribe = 1 LIMIT 1";
 
-        if(!$res = mysql_query($query))
-            throw new Exception("Cannot select email from maillog: " . mysql_error ($db) . "\nQuery: $query");
+        if (!$res = mysql_query($q))
+            throw new Exception("Cannot select email from maillog: " . mysql_error ($db));
 
-        while ($row = mysql_fetch_row($res)) {
-
-            if ($row[0] == 1) {
-                print "Won't sent to {$raw_rcpt_to}: message to this email was bounced lately\n";
-                $queue->ack($message);
-                continue 2;
-            }
-
-            if ($row[1] == 1 && $mail['campaign'] > 0) {
-                print "Won't send ro {$raw_rcpt_to}: recipient unsubscribed from mailing\n";
-                $queue->ack($message);
-                continue 2;
-            }
+        if (mysql_num_rows($res) > 0) {
+            print "Won't send to {$raw_rcpt_to}: message to this email was bounced lately or recipient unsubscribed from mailing\n";
+            $queue->ack($message);
+            continue;
         }
 
         if (!isset($mail['headers']['Reply-To']))   $mail['headers']['Reply-To'] = $config['mail']['reply'];
@@ -72,13 +87,11 @@ try {
 
         $mail['headers']['Message-Id'] = "<wikimart-{$message_id}@{$hostname}>";
 
-
         if (!isset($mail['data']))
             throw new Exception('Nothing to send');
 
         if (isset($mail['headers']['Subject'])) {
-            if(substr($mail['headers']['Subject'], 0, 2) != '=?')
-                $mail['headers']['Subject'] = encoded_word($mail['headers']['Subject']);
+            $mail['headers']['Subject'] = encoded_word($mail['headers']['Subject']);
         } else
             throw new Exception('No subject specified');
 
@@ -88,7 +101,6 @@ try {
         $client = isset($mail['sender']) ? $mail['sender'] : 'queue';
 
         $mail['headers']['Received'] = "from {$client} by wikimart-mailer at {$hostname}";
-
 
         foreach ($mail['headers'] as $name => $value) {
             $mail_text .= $name .': '. $value . CR;
@@ -110,13 +122,12 @@ try {
 
         $queue->ack($message);
 
+        print "Mail for {$mail['headers']['To']} enqueued, campaign {$mail['campaign']}\n";
+
         $campaign = $mail['campaign'];
 
         if(!mysql_query("INSERT INTO maillog(`email`,`message_id`, `campaign`) VALUES ('{$escaped_rcpt_to}', UNHEX(REPLACE('{$message_id}', '-', '')), {$campaign})" ))
             throw new Exception("Cannot insert record to maillog" . mysql_error ($db));
-
-        print "Mail for {$mail['headers']['To']} enqueued, campaign {$mail['campaign']}\n";
-
 
     }
 }

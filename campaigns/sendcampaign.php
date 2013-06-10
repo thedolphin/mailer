@@ -5,8 +5,8 @@ require '../common.php';
 
 /*
     Additional headers
-                "X-Report-Abuse-To: <mailto:{$config['mail']['abuse']}?subject=abuse-{$message_id}>\n" .
-                "List-Unsubscribe: <mailto:{$config['mail']['sender']}?subject=unsubscribe-{$message_id}>\n" .
+                "X-Report-Abuse-To: <mailto:{$config['mail']['abuse']}?subject=abuse-{$message_id}>"
+                "List-Unsubscribe: http://mailer.wikimart.ru/unsubscribe?id={$message_id}&unsub=yes"
 */
 
 $config = new config();
@@ -28,6 +28,7 @@ if (preg_match_all( "/<\s*a\s+href\s*=\s*[\"']{1}(.+?)[\"|']{1}/i", $body, $matc
 
 $body = str_replace('*|UNSUB|*', "http://mailer.wikimart.ru/unsubscribe?id={$message_id}", $body);
 $body = str_replace('*|EMPTYGIF|*', "<img src=\"http://mailer.wikimart.ru/onepx.gif?id={$message_id}\">", $body);
+$body = str_replace('*|PRICE1|*', $argv[6], $body);
 
 $boundary = str_rand(32);
 
