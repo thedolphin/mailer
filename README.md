@@ -2,7 +2,7 @@
 
 Bunch of scripts for building system for sending advertisement newsletters
 
-Copyright (c) Wikimart 2013-2017
+Copyright (c) Wikimart 2013-2017  
 Copyright (c) Alexander Rumyantsev
 
 # Рассыльщик
